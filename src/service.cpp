@@ -77,6 +77,11 @@
 #include <cppcms/config.h>
 
 #ifndef CPPCMS_WIN32
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <grp.h>
+
 #include "daemonize.h"
 #endif
 
@@ -815,7 +820,15 @@ std::auto_ptr<cppcms::impl::cgi::acceptor> service::setup_acceptor(json::value c
 			if(socket=="stdin")
 				a = scgi_api_unix_socket_factory(*this,backlog);
 			else
+			{
+				std::string group=v.get("allow_group","");
+
 				a = scgi_api_unix_socket_factory(*this,socket,backlog);
+				if (group.length() > 0)
+				{
+					allow_unix_group(socket, group);
+				}
+			}
 		}
 		#endif
 		
@@ -824,7 +837,15 @@ std::auto_ptr<cppcms::impl::cgi::acceptor> service::setup_acceptor(json::value c
 			if(socket=="stdin")
 				a = fastcgi_api_unix_socket_factory(*this,backlog);
 			else
+			{
+				std::string group=v.get("allow_group","");
+
 				a = fastcgi_api_unix_socket_factory(*this,socket,backlog);
+				if (group.length() > 0)
+				{
+					allow_unix_group(socket, group);
+				}
+			}
 		}
 		#endif
 
@@ -841,6 +862,31 @@ std::auto_ptr<cppcms::impl::cgi::acceptor> service::setup_acceptor(json::value c
 	a->rcvbuf(rcvbuf);
 
 	return a;
+}
+
+void service::allow_unix_group(const std::string &socket,
+		                       const std::string &group)
+{
+	gid_t        gid;
+	struct group *grp;
+	int          res;
+
+	grp = getgrnam(group.c_str());
+	if (NULL == grp) {
+		throw cppcms_error("Invalid group name specified.");
+	}
+
+	gid = grp->gr_gid;
+
+	res = chown(socket.c_str(), -1, gid);
+	if (-1 == res) {
+		throw cppcms_error("Group chown of socket failed.");
+	}
+
+	res = chmod(socket.c_str(), 0770);
+	if (-1 == res) {
+		throw cppcms_error("Attribute change of socket failed.");
+	}
 }
 
 void service::start_acceptor(bool after_fork)

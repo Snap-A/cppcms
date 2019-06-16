@@ -210,6 +210,7 @@ namespace cppcms {
 		std::auto_ptr<cppcms::impl::cgi::acceptor> setup_acceptor(json::value const &,int,int shift=0);
 		void stop();
 		void start_acceptor(bool after_fork=false);
+		void allow_unix_group(const std::string &socket, const std::string &group);
 		void setup_exit_handling();
 		bool prefork();
 		void run_prepare();
